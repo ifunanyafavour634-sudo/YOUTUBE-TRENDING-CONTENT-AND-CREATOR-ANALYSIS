@@ -1,5 +1,5 @@
 # YOUTUBE-TRENDING-CONTENT-AND-CREATOR-ANALYSIS
-# AICINES YOUTUBE CONTENT & CREATOR PERFORMANCE ANALYSIS
+#  YOUTUBE CONTENT & CREATOR PERFORMANCE ANALYSIS
 <img width="582" height="327" alt="Screenshot 2026-09-14 165508" src="https://github.com/user-attachments/assets/d4f19b55-3427-476d-8a91-8aa42bd97ae5" />
 
 # TABLE OF CONTENTS
@@ -18,11 +18,11 @@
 
 ## BACKGROUND
 
-AICines operates in a creator and content-driven environment where understanding creator performance, content discovery, audience engagement, and trending behaviour is important for making informed platform decisions.
+Youtube operates in a creator and content-driven environment where understanding creator performance, content discovery, audience engagement, and trending behaviour is important for making informed platform decisions.
 
 For a creator-focused platform, views alone do not provide a complete picture of content performance. A video may generate substantial reach without generating proportionally strong audience interaction, while another may attract a smaller audience but demonstrate much stronger engagement and sustained trending performance.
 
-As a Data Analyst working with AICines-style business problems, the objective of this project is to use data to understand:
+As a Data Analyst working with Youtube business problems, the objective of this project is to use data to understand:
 
 1. Which creators demonstrate strong audience engagement?
 2. Which videos attract the most audience attention?
