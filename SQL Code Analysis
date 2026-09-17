@@ -1,7 +1,5 @@
 SQL skills demonstrated
 
-The queries deliberately demonstrate the skills a Data Analyst recruiter would look for:
-
 CTEs
 ROW_NUMBER()
 Window functions
@@ -46,7 +44,6 @@ How many creators?
 How many categories?
 What period does the dataset cover?
 
-This is an important recruiter-level practice because analysis should begin with data validation, not immediately with charts.
 
 2. Check duplicate video/date combinations
 SELECT
@@ -313,7 +310,7 @@ People & Blogs — 3.90%
 Gaming — 3.50%
 Music — 3.39%
 
-This is a particularly useful AICines insight because the category generating the most reach is not necessarily the category generating the highest engagement rate.
+
 
 F. Business Question 4
 What patterns can we see in trending/discovery activity over time?
@@ -499,17 +496,6 @@ The overall latest-snapshot dataset has approximately:
 352.96M likes
 40.97M comments
 3.16% overall engagement rate
-2. What a Recruiter Should See in Your SQL Repository
 
-I recommend organizing the SQL folder like this:
 
-sql/
-│
-├── 01_data_quality_checks.sql
-├── 02_analytical_base.sql
-├── 03_creator_performance.sql
-├── 04_content_performance.sql
-├── 05_category_performance.sql
-├── 06_trending_discovery.sql
-├── 07_creator_consistency.sql
-└── 08_engagement_analysis.sql
+
