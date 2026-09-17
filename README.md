@@ -1,6 +1,7 @@
 # YOUTUBE-TRENDING-CONTENT-AND-CREATOR-ANALYSIS
 #  YOUTUBE CONTENT & CREATOR PERFORMANCE ANALYSIS
-<img width="582" height="327" alt="Screenshot 2026-09-14 165508" src="https://github.com/user-attachments/assets/d4f19b55-3427-476d-8a91-8aa42bd97ae5" />
+<img width="585" height="325" alt="Screenshot 2026-09-17 175119" src="https://github.com/user-attachments/assets/bf555148-9efa-4119-946e-b73d70ce1e3e" />
+
 
 # TABLE OF CONTENTS
 
