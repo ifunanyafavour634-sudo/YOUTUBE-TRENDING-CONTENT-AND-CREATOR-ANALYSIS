@@ -1,0 +1,515 @@
+SQL skills demonstrated
+
+The queries deliberately demonstrate the skills a Data Analyst recruiter would look for:
+
+CTEs
+ROW_NUMBER()
+Window functions
+RANK()
+COUNT(DISTINCT ...)
+GROUP BY
+HAVING
+CASE
+NULLIF
+ROUND
+Aggregate calculations
+Date functions
+Deduplication logic
+Latest-record selection
+Engagement-rate calculations
+Category mapping
+Multi-step analytical logic
+Business-oriented KPI design
+Data-quality validation
+PostgreSQL-specific techniques
+Separation of preparation from analysis
+Avoiding double-counting repeated observations
+A. Data Quality & Validation
+1. Validate the imported dataset
+SELECT
+    COUNT(*) AS total_records,
+    COUNT(DISTINCT video_id) AS unique_videos,
+    COUNT(DISTINCT channel_title) AS unique_creators,
+    COUNT(DISTINCT category_id) AS unique_categories,
+    MIN(trending_date) AS first_trending_date,
+    MAX(trending_date) AS last_trending_date
+FROM usvideos_clean;
+Why this is used
+
+This establishes the analytical population before calculating KPIs.
+
+It answers:
+
+How many observations are available?
+How many unique videos?
+How many creators?
+How many categories?
+What period does the dataset cover?
+
+This is an important recruiter-level practice because analysis should begin with data validation, not immediately with charts.
+
+2. Check duplicate video/date combinations
+SELECT
+    video_id,
+    trending_date,
+    COUNT(*) AS record_count
+FROM usvideos_clean
+GROUP BY video_id, trending_date
+HAVING COUNT(*) > 1
+ORDER BY record_count DESC;
+Why this is used
+
+The dataset is a daily trending snapshot, so a video can legitimately appear on multiple dates.
+
+However, the same video should have one analytical observation per trending date.
+
+This query identifies duplicate daily observations without incorrectly treating repeated trending appearances as duplicates.
+
+B. Create the Analytical Base
+
+This is one of the most important queries in the project.
+
+WITH cleaned_daily AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY video_id, trending_date
+            ORDER BY views DESC, likes DESC, comment_count DESC
+        ) AS daily_rank
+    FROM usvideos_clean
+),
+
+daily_base AS (
+    SELECT *
+    FROM cleaned_daily
+    WHERE daily_rank = 1
+)
+
+SELECT *
+FROM daily_base;
+Why this is used
+
+This creates one record per video per trending date.
+
+It prevents duplicate daily observations from inflating:
+
+trending frequency
+creator activity
+video trending days
+daily discovery metrics
+
+The ROW_NUMBER() window function is particularly valuable here because it demonstrates that you understand the difference between:
+
+repeated legitimate observations
+
+and
+
+duplicate observations that must be controlled.
+
+C. Business Question 1
+Which creators are performing strongest based on audience engagement?
+
+A major analytical issue is that the same video appears multiple times in the raw trending dataset.
+
+Therefore, we should not sum all daily snapshots of views and likes when measuring creator performance.
+
+Instead, we use each video's latest observed snapshot.
+
+WITH latest_video AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY video_id
+            ORDER BY trending_date DESC
+        ) AS rn
+    FROM usvideos_clean
+),
+
+creator_performance AS (
+    SELECT
+        channel_title,
+        COUNT(DISTINCT video_id) AS videos,
+        SUM(views) AS total_views,
+        SUM(likes) AS total_likes,
+        SUM(comment_count) AS total_comments,
+        ROUND(
+            100.0 * SUM(likes + comment_count)
+            / NULLIF(SUM(views), 0),
+            2
+        ) AS engagement_rate_pct
+    FROM latest_video
+    WHERE rn = 1
+    GROUP BY channel_title
+)
+
+SELECT
+    channel_title,
+    videos,
+    total_views,
+    total_likes,
+    total_comments,
+    engagement_rate_pct
+FROM creator_performance
+ORDER BY engagement_rate_pct DESC;
+Why this is used
+
+This query combines:
+
+CTEs
+window functions
+aggregation
+COUNT(DISTINCT)
+NULLIF
+percentage calculation
+
+Most importantly, it prevents the same video's historical daily snapshots from being counted repeatedly.
+
+Actual finding from the dataset
+
+Among creators with at least three videos, the highest aggregate engagement rates include:
+
+5SOSVEVO — 22.26%
+ShawnMendesVEVO — 20.52%
+BANGTANTV — 19.62%
+Camila Cabello — 18.36%
+ibighit — 18.26%
+
+At the same time, reach and engagement are different dimensions. For example, ibighit has 9 videos and approximately 271.75M latest-snapshot views, showing that a creator can combine substantial reach with strong engagement.
+
+That distinction is important for AICines: creator scale should not be evaluated using views alone.
+
+D. Business Question 2
+Which content/videos attract the most audience attention?
+Top videos by reach
+WITH latest_video AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY video_id
+            ORDER BY trending_date DESC
+        ) AS rn
+    FROM usvideos_clean
+)
+
+SELECT
+    video_id,
+    title,
+    channel_title,
+    category_id,
+    views,
+    likes,
+    comment_count,
+    ROUND(
+        100.0 * (likes + comment_count)
+        / NULLIF(views, 0),
+        2
+    ) AS engagement_rate_pct
+FROM latest_video
+WHERE rn = 1
+ORDER BY views DESC
+LIMIT 20;
+Why this is used
+
+It identifies content with the greatest audience reach while also exposing engagement.
+
+The important point is that the query does not simply return the most-viewed rows. It first establishes one latest snapshot per video.
+
+Actual top content
+
+The highest-viewed videos include:
+
+Childish Gambino – This Is America — 225.21M views
+YouTube Rewind: The Shape of 2017 — 149.38M
+Ariana Grande – No Tears Left To Cry — 148.69M
+Becky G, Natti Natasha – Sin Pijama — 139.33M
+BTS – FAKE LOVE — 123.01M
+
+This also reveals a strong concentration of high-reach content around Music and Entertainment.
+
+E. Business Question 3
+Which content categories perform best?
+
+Because the CSV contains category_id rather than a readable category name, the SQL analysis should map the IDs to category names.
+
+A recruiter-friendly approach is a CTE mapping:
+
+WITH category_map AS (
+    SELECT *
+    FROM (
+        VALUES
+            (1, 'Film & Animation'),
+            (2, 'Autos & Vehicles'),
+            (10, 'Music'),
+            (15, 'Pets & Animals'),
+            (17, 'Sports'),
+            (19, 'Travel & Events'),
+            (20, 'Gaming'),
+            (22, 'People & Blogs'),
+            (23, 'Comedy'),
+            (24, 'Entertainment'),
+            (25, 'News & Politics'),
+            (26, 'Howto & Style'),
+            (27, 'Education'),
+            (28, 'Science & Technology'),
+            (29, 'Nonprofits & Activism'),
+            (43, 'Shows')
+    ) AS x(category_id, category_name)
+),
+
+latest_video AS (
+    SELECT *,
+           ROW_NUMBER() OVER (
+               PARTITION BY video_id
+               ORDER BY trending_date DESC
+           ) AS rn
+    FROM usvideos_clean
+)
+
+SELECT
+    c.category_name,
+    COUNT(DISTINCT v.video_id) AS videos,
+    SUM(v.views) AS total_views,
+    SUM(v.likes) AS total_likes,
+    SUM(v.comment_count) AS total_comments,
+    ROUND(
+        100.0 * SUM(v.likes + v.comment_count)
+        / NULLIF(SUM(v.views), 0),
+        2
+    ) AS engagement_rate_pct
+FROM latest_video v
+JOIN category_map c
+    ON v.category_id = c.category_id
+WHERE v.rn = 1
+GROUP BY c.category_name
+ORDER BY total_views DESC;
+Why this is used
+
+This demonstrates:
+
+CTEs
+inline dimension mapping
+JOIN
+aggregation
+calculated KPIs
+NULLIF
+readable business output
+Actual findings
+
+By latest-snapshot views:
+
+Category	Videos	Views
+Music	801	4.83B
+Entertainment	1,621	2.83B
+Film & Animation	320	814.52M
+Comedy	544	773.84M
+People & Blogs	495	667.66M
+
+For engagement, among categories with at least 50 videos:
+
+Comedy — 4.26%
+Howto & Style — 4.23%
+Education — 3.96%
+People & Blogs — 3.90%
+Gaming — 3.50%
+Music — 3.39%
+
+This is a particularly useful AICines insight because the category generating the most reach is not necessarily the category generating the highest engagement rate.
+
+F. Business Question 4
+What patterns can we see in trending/discovery activity over time?
+SELECT
+    trending_date,
+    COUNT(DISTINCT video_id) AS unique_trending_videos,
+    COUNT(DISTINCT channel_title) AS active_creators,
+    COUNT(*) AS trending_observations
+FROM usvideos_clean
+GROUP BY trending_date
+ORDER BY trending_date;
+Why this is used
+
+This measures the discovery layer of the platform.
+
+Instead of asking only:
+
+"What videos have the most views?"
+
+we ask:
+
+"What does the trending ecosystem look like over time?"
+
+This is much closer to an AICines creator/content-platform problem.
+
+Actual finding
+
+The dataset covers 205 observed trending dates from November 2017 through June 2018.
+
+Most days contain approximately 200 trending observations, with the observed daily range being 196–200.
+
+That means raw daily volume is structurally constrained and should not be interpreted as organic audience demand by itself.
+
+For Power BI, the useful visualization is therefore a time-series showing:
+
+unique trending videos
+active creators
+trending observations
+
+rather than presenting raw row count as a popularity KPI.
+
+G. Business Question 5
+Which creators consistently produce content that trends?
+
+First determine how long each video remained in the trending dataset:
+
+WITH video_trending AS (
+    SELECT
+        video_id,
+        channel_title,
+        title,
+        COUNT(DISTINCT trending_date) AS trending_days
+    FROM usvideos_clean
+    GROUP BY
+        video_id,
+        channel_title,
+        title
+)
+
+SELECT
+    video_id,
+    title,
+    channel_title,
+    trending_days
+FROM video_trending
+ORDER BY trending_days DESC
+LIMIT 20;
+Why this is used
+
+This separates one-time viral success from sustained discovery.
+
+Actual finding
+
+The longest observed trending durations include:
+
+Sam Smith — 29 days
+Lucas and Marcus — 29 days
+grav3yardgirl — 28 days
+20th Century Fox — 28 days
+Complex — 28 days
+Creator-level consistency
+WITH video_trending AS (
+    SELECT
+        video_id,
+        channel_title,
+        COUNT(DISTINCT trending_date) AS trending_days
+    FROM usvideos_clean
+    GROUP BY
+        video_id,
+        channel_title
+),
+
+creator_consistency AS (
+    SELECT
+        channel_title,
+        COUNT(DISTINCT video_id) AS videos,
+        SUM(trending_days) AS total_trending_video_days,
+        ROUND(AVG(trending_days), 2) AS avg_trending_days_per_video,
+        MAX(trending_days) AS longest_trending_duration
+    FROM video_trending
+    GROUP BY channel_title
+)
+
+SELECT
+    channel_title,
+    videos,
+    total_trending_video_days,
+    avg_trending_days_per_video,
+    longest_trending_duration
+FROM creator_consistency
+WHERE videos >= 3
+ORDER BY
+    avg_trending_days_per_video DESC,
+    longest_trending_duration DESC;
+Why the videos >= 3 condition matters
+
+Without a minimum volume requirement, a creator with one unusually successful video could dominate a consistency analysis.
+
+This is a good example of analytical judgment, not just SQL syntax.
+
+The dataset shows creators such as zefrank1, Gibi ASMR, Bleacher Report, and VH1 with high average trending duration among creators with at least three observed videos.
+
+H. Business Question 6
+How strong is audience engagement relative to content reach?
+WITH latest_video AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY video_id
+            ORDER BY trending_date DESC
+        ) AS rn
+    FROM usvideos_clean
+)
+
+SELECT
+    video_id,
+    title,
+    channel_title,
+    views,
+    likes,
+    comment_count,
+
+    ROUND(
+        100.0 * likes / NULLIF(views, 0),
+        2
+    ) AS like_rate_pct,
+
+    ROUND(
+        100.0 * comment_count / NULLIF(views, 0),
+        2
+    ) AS comment_rate_pct,
+
+    ROUND(
+        100.0 * (likes + comment_count)
+        / NULLIF(views, 0),
+        2
+    ) AS engagement_rate_pct
+
+FROM latest_video
+WHERE rn = 1
+ORDER BY engagement_rate_pct DESC;
+Why this is used
+
+This creates three useful product/content KPIs:
+
+Like Rate
+
+likes ÷ views × 100
+
+Comment Rate
+
+comments ÷ views × 100
+
+Overall Engagement Rate
+
+(likes + comments) ÷ views × 100
+
+This is more informative than views alone.
+
+The overall latest-snapshot dataset has approximately:
+
+12.46B views
+352.96M likes
+40.97M comments
+3.16% overall engagement rate
+2. What a Recruiter Should See in Your SQL Repository
+
+I recommend organizing the SQL folder like this:
+
+sql/
+│
+├── 01_data_quality_checks.sql
+├── 02_analytical_base.sql
+├── 03_creator_performance.sql
+├── 04_content_performance.sql
+├── 05_category_performance.sql
+├── 06_trending_discovery.sql
+├── 07_creator_consistency.sql
+└── 08_engagement_analysis.sql
